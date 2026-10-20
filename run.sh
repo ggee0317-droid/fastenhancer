@@ -2,15 +2,17 @@
 # lowlat 재학습 실행 스크립트 (WSL2, 저장소 루트에서)
 # 사용법: bash run.sh sanity | time X | train X | export X | export_plain X   (X = l0ft, l2, l3)
 # 메모리가 부족하면 앞에 BS=32 를 붙임. 예: BS=32 bash run.sh train l2
+# 에폭 수는 앞에 EP=200 을 붙임(처음 시작할 때만 의미 있음, lr 코사인이 이 값에 맞춰짐). 예: EP=200 bash run.sh train l3
 set -e
 cd "$(dirname "$0")"
 [ -f "$HOME/miniforge3/etc/profile.d/conda.sh" ] && source "$HOME/miniforge3/etc/profile.d/conda.sh" && conda activate fe
-B=${BS:+train.batch_size=$BS valid.batch_size=$BS}
+BSP=${BS:+train.batch_size=$BS valid.batch_size=$BS}
+B="$BSP${EP:+ train.max_epochs=$EP}"; B=${B# }               # time 모드는 EP를 무시(항상 2에폭)
 case "$1" in
   sanity) python train.py -n lowlat/sanity -c configs/lowlat/t_l0ft.yaml -f \
             -p train.test=True pesq.interval=1 train.optimizer_kwargs.lr=1.0e-6 ;;
   time)   python train.py -n lowlat/time_$2 -c configs/lowlat/t_$2.yaml -f \
-            -p train.max_epochs=2 pesq.interval=1000 $B ;;
+            -p train.max_epochs=2 pesq.interval=1000 $BSP ;;
   train)  if ls logs/lowlat/t_$2/*.pth >/dev/null 2>&1
           then python train.py -n lowlat/t_$2 ${B:+-f -p $B}                    # 체크포인트가 있으면 이어서 (-p를 쓰면 -f 필요)
           else python train.py -n lowlat/t_$2 -c configs/lowlat/t_$2.yaml -f ${B:+-p $B}; fi ;;

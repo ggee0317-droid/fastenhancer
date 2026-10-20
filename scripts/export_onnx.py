@@ -132,7 +132,7 @@ def main(args):
                 wav_hat, *cache_list = model(wav_i, *cache_list)
                 out.append(wav_hat)         # [B, hop_size]
             wav_hat = torch.cat(out, dim=1) # [B, T_wav]
-        start_idx = n_fft - hop_size
+        start_idx = getattr(model.model.stft, "syn", n_fft) - hop_size   # lowlat: 비대칭 창(L3)은 합성창 길이 기준
         wav_hat = wav_hat[:, start_idx:start_idx+length]
         scipy.io.wavfile.write(
             "onnx/delete_it_streaming.wav",
@@ -197,7 +197,7 @@ def main(args):
     if args.save_output:
         print("Saving the output audio...", end=" ")
         wav_out = np.concatenate(wav_out, axis=0)
-        start_idx = n_fft - hop_size
+        start_idx = getattr(model.model.stft, "syn", n_fft) - hop_size   # lowlat: 비대칭 창(L3)은 합성창 길이 기준
         wav_out = wav_out[start_idx:start_idx+length]
         wav_out = np.clip(wav_out, a_min=-1.0, a_max=1.0)
         scipy.io.wavfile.write("onnx/delete_it_onnx.wav", sr, wav_out)
