@@ -49,6 +49,7 @@ class ModelWrapper:
         self.sr = hps.data.sampling_rate
 
         self._module = self.model
+        self.init_from = getattr(hps.train, "init_from", None) if train else None
         if train:
             hp = hps.train
             self.test = getattr(hp, "test", False)
@@ -308,6 +309,13 @@ class ModelWrapper:
     def load(self, epoch: Optional[int] = None, path: Optional[str] = None, strict: bool = True):
         checkpoint = self.get_checkpoint(epoch, path)
         if checkpoint is None:
+            if self.init_from:   # lowlat: 공개 가중치의 모델 부분만 초기값으로. optimizer·scheduler·epoch는 새로 시작
+                src = torch.load(self.init_from, map_location=self.device)["model"]
+                own = self._module.state_dict()
+                ok = {k: v for k, v in src.items() if k in own and v.shape == own[k].shape}
+                self._module.load_state_dict(ok, strict=False)
+                if self.rank == 0:
+                    print(f"init_from: {len(ok)}/{len(own)} loaded, skipped {sorted(set(own) - set(ok))}")
             return
 
         self._module.load_state_dict(checkpoint['model'], strict=strict)
